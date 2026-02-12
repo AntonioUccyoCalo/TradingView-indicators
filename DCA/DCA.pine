@@ -1,0 +1,204 @@
+//@version=6
+indicator("Dollar Cost Average (DCA - PAC) + Inflation adgustment", overlay=false)
+
+// --- Input ---
+monthlyAmount = input.int(100, "Monthly Amount", minval=1, step=10, group="DCA Settings")
+startDate = input.time(timestamp("2005-12-01"), "Start Date", group="Period")
+endDate   = input.time(timestamp("2025-12-31"), "End Date",   group="Period")
+taxRate   = input.float(26.0, "Capital Gains Tax %", minval=0, maxval=100, step=0.5, group="Taxation")
+enableCpi = input.bool(true, "Enable CPI Adjustment", group="Inflation")
+cpiCountry = input.string("USA", "CPI Country", options=["USA", "EU", "UK", "Japan", "Canada", "Australia"], group="Inflation")
+
+// --- CPI Data ---
+cpiSymbol = switch cpiCountry
+    "USA"       => "FRED:CPIAUCSL"
+    "EU"        => "FRED:CP0000EZ19M086NEST"
+    "UK"        => "FRED:GBRCPIALLMINMEI"
+    "Japan"     => "FRED:JPNCPIALLMINMEI"
+    "Canada"    => "FRED:CANCPIALLMINMEI"
+    "Australia" => "FRED:AUSCPIALLMINMEI"
+    => "FRED:CPIAUCSL"
+
+cpiValue = enableCpi ? request.security(cpiSymbol, "M", close) : na
+
+// --- Format number with thousands separator (international: 1,234,567.89) ---
+formatNumber(float val, int decimals) =>
+    string sign = val < 0 ? "-" : ""
+    float absVal = math.abs(val)
+    int intPart = int(absVal)
+    string intStr = str.tostring(intPart)
+    int len = str.length(intStr)
+    string result = ""
+    for i = 0 to len - 1
+        if i > 0 and (len - i) % 3 == 0
+            result += ","
+        result += str.substring(intStr, i, i + 1)
+    if decimals > 0
+        int decInt = int(math.round((absVal - intPart) * math.pow(10, decimals)))
+        string decStr = str.tostring(decInt)
+        int padCount = decimals - str.length(decStr)
+        if padCount > 0
+            for _i = 1 to padCount
+                decStr := "0" + decStr
+        result += "." + str.substring(decStr, 0, decimals)
+    sign + result
+
+// --- Persistent variables ---
+var float totalInvested = 0.0
+var float totalShares = 0.0
+var float maxPortfolioValue = 0.0
+var float maxDrawdownPct = 0.0
+var float totalInvestedReal = 0.0
+var float cpiStart = na
+
+// --- Logic ---
+newMonth = ta.change(time("M")) != 0
+inRange = time >= startDate and time <= endDate
+
+if newMonth and inRange
+    totalInvested += monthlyAmount
+    totalShares += monthlyAmount / close
+    if na(cpiStart) and not na(cpiValue) and cpiValue > 0
+        cpiStart := cpiValue
+    // Deflate: each contribution is worth (monthlyAmount * latestCPI / cpiAtPurchase)
+    // We accumulate the raw sum here and adjust with current CPI on every bar
+    if not na(cpiValue) and cpiValue > 0
+        totalInvestedReal += monthlyAmount / cpiValue
+    else
+        totalInvestedReal += monthlyAmount
+
+portfolioValue = totalShares * close
+
+// --- Real (inflation-adjusted) invested ---
+// totalInvestedReal stores sum of (monthlyAmount / CPI_at_purchase)
+// Multiply by current CPI to get today's purchasing power equivalent
+currentCpi = cpiValue
+investedReal = (not na(currentCpi) and currentCpi > 0) ? totalInvestedReal * currentCpi : totalInvested
+
+profitLoss = portfolioValue - totalInvested
+profitLossPct = totalInvested > 0 ? (profitLoss / totalInvested) * 100 : 0.0
+
+// --- Real P/L ---
+profitLossReal = portfolioValue - investedReal
+profitLossRealPct = investedReal > 0 ? (profitLossReal / investedReal) * 100 : 0.0
+
+// --- Average Cost Basis ---
+avgPrice = totalShares > 0 ? totalInvested / totalShares : 0.0
+
+// --- Max Drawdown ---
+if portfolioValue > maxPortfolioValue
+    maxPortfolioValue := portfolioValue
+currentDrawdownPct = maxPortfolioValue > 0 ? ((portfolioValue - maxPortfolioValue) / maxPortfolioValue) * 100 : 0.0
+if currentDrawdownPct < maxDrawdownPct
+    maxDrawdownPct := currentDrawdownPct
+
+// --- Annualized return ---
+var int monthsCount = 0
+if newMonth and inRange
+    monthsCount += 1
+years = monthsCount / 12.0
+annualizedPct = (years > 0 and totalInvested > 0) ? (math.pow(portfolioValue / totalInvested, 1.0 / years) - 1) * 100 : 0.0
+annualizedRealPct = (years > 0 and investedReal > 0) ? (math.pow(portfolioValue / investedReal, 1.0 / years) - 1) * 100 : 0.0
+
+// --- Taxes ---
+taxAmount = profitLoss > 0 ? profitLoss * (taxRate / 100) : 0.0
+taxAmountReal = profitLossReal > 0 ? profitLossReal * (taxRate / 100) : 0.0
+
+// --- Net after taxes ---
+netValue = profitLoss > 0 ? portfolioValue - taxAmount : portfolioValue
+netValueReal = profitLossReal > 0 ? portfolioValue - taxAmountReal : portfolioValue
+
+// --- Summary table ---
+numCols = enableCpi ? 3 : 2
+numRows = enableCpi ? 13 : 12
+var table infoTable = table.new(position.top_right, numCols, numRows, bgcolor=color.new(color.black, 80), border_width=1)
+
+plColor = profitLoss >= 0 ? color.green : color.red
+plRealColor = profitLossReal >= 0 ? color.green : color.red
+
+if barstate.islast
+    // Header row
+    table.cell(infoTable, 0, 0, "",                text_color=color.white, text_size=size.normal)
+    table.cell(infoTable, 1, 0, enableCpi ? "Nominal" : "",  text_color=color.gray,  text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, 2, 0, "Real (CPI)",      text_color=color.gray,  text_size=size.normal)
+
+    // Invested
+    table.cell(infoTable, 0, 1, "Invested",          text_color=color.white, text_size=size.normal)
+    table.cell(infoTable, 1, 1, formatNumber(totalInvested, 2),              text_color=color.white, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, 2, 1, formatNumber(investedReal, 2),               text_color=color.yellow, text_size=size.normal)
+
+    // Portfolio Value
+    table.cell(infoTable, 0, 2, "Portfolio Value",    text_color=color.white, text_size=size.normal)
+    table.cell(infoTable, 1, 2, formatNumber(portfolioValue, 2),             text_color=color.white, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, 2, 2, "-",                                          text_color=color.gray,  text_size=size.normal)
+
+    // N. Investments
+    table.cell(infoTable, 0, 3, "N. Investments",   text_color=color.white, text_size=size.normal)
+    table.cell(infoTable, 1, 3, str.tostring(monthsCount),                   text_color=color.white, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, 2, 3, "-",                                          text_color=color.gray,  text_size=size.normal)
+
+    // Avg Cost
+    table.cell(infoTable, 0, 4, "Avg Cost",           text_color=color.white, text_size=size.normal)
+    table.cell(infoTable, 1, 4, formatNumber(avgPrice, 2),                   text_color=color.white, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, 2, 4, "-",                                          text_color=color.gray,  text_size=size.normal)
+
+    // P/L %
+    table.cell(infoTable, 0, 5, "P/L %",           text_color=color.white, text_size=size.normal)
+    table.cell(infoTable, 1, 5, formatNumber(profitLossPct, 2) + " %",       text_color=plColor, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, 2, 5, formatNumber(profitLossRealPct, 2) + " %",   text_color=plRealColor, text_size=size.normal)
+
+    // P/L
+    table.cell(infoTable, 0, 6, "P/L",              text_color=color.white, text_size=size.normal)
+    table.cell(infoTable, 1, 6, formatNumber(profitLoss, 2),                 text_color=plColor, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, 2, 6, formatNumber(profitLossReal, 2),             text_color=plRealColor, text_size=size.normal)
+
+    // P/L % Ann.
+    table.cell(infoTable, 0, 7, "P/L % Ann.",       text_color=color.white, text_size=size.normal)
+    table.cell(infoTable, 1, 7, formatNumber(annualizedPct, 2) + " %",      text_color=plColor, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, 2, 7, formatNumber(annualizedRealPct, 2) + " %",  text_color=plRealColor, text_size=size.normal)
+
+    // Max Drawdown
+    table.cell(infoTable, 0, 8, "Max Drawdown",      text_color=color.orange, text_size=size.normal)
+    table.cell(infoTable, 1, 8, formatNumber(maxDrawdownPct, 2) + " %",     text_color=color.orange, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, 2, 8, "-",                                          text_color=color.gray,  text_size=size.normal)
+
+    // Tax Rate
+    table.cell(infoTable, 0, 9, "Tax Rate",          text_color=color.red, text_size=size.normal)
+    table.cell(infoTable, 1, 9, formatNumber(taxRate, 2) + " %",            text_color=color.red, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, 2, 9, "-",                                          text_color=color.gray,  text_size=size.normal)
+
+    // Tax on P/L
+    table.cell(infoTable, 0, 10, "Tax on P/L",       text_color=color.red, text_size=size.normal)
+    table.cell(infoTable, 1, 10, formatNumber(taxAmount, 2),                 text_color=color.red, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, 2, 10, formatNumber(taxAmountReal, 2),              text_color=color.red, text_size=size.normal)
+
+    // Net After Taxes
+    table.cell(infoTable, 0, 11, "Net After Taxes",   text_color=color.aqua, text_size=size.normal)
+    table.cell(infoTable, 1, 11, formatNumber(netValue, 2),                   text_color=color.aqua, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, 2, 11, formatNumber(netValueReal, 2),               text_color=color.aqua, text_size=size.normal)
+
+    // CPI info
+    if enableCpi
+        table.cell(infoTable, 0, 12, "CPI (" + cpiCountry + ")",  text_color=color.gray, text_size=size.small)
+        table.cell(infoTable, 1, 12, not na(cpiStart) ? formatNumber(cpiStart, 1) : "N/A", text_color=color.gray, text_size=size.small)
+        table.cell(infoTable, 2, 12, not na(currentCpi) ? formatNumber(currentCpi, 1) : "N/A", text_color=color.gray, text_size=size.small)
+
+// --- Plot ---
+p1 = plot(totalInvested, "Total Invested (Nominal)", color.orange, 2)
+p3 = plot(enableCpi ? investedReal : na, "Total Invested (Real)", color.yellow, 2, style=plot.style_line)
+cvColor = portfolioValue >= totalInvested ? color.green : color.red
+p2 = plot(portfolioValue, "Portfolio Value", cvColor, 2)
+fillColor = portfolioValue >= totalInvested ? color.new(color.green, 85) : color.new(color.red, 85)
+fill(p1, p2, color=fillColor)
