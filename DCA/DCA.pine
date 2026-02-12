@@ -331,7 +331,7 @@ if barstate.islast
 // --- Plot ---
 p1 = plot(totalInvested, "Total Invested (Nominal)", color.orange, 2)
 p3 = plot(enableCpi ? investedReal : na, "Total Invested (Real)", color.yellow, 2, style=plot.style_line)
-p4 = plot(enableFxAdj ? totalInvestedHomeCcy : na, "Total Invested (FX)", color.purple, 2, style=plot.style_line)
+p4 = plot(enableFxAdj ? totalInvested * homePerPortfolio : na, "Total Invested (FX)", color.purple, 2, style=plot.style_line)
 cvColor = portfolioValue >= totalInvested ? color.green : color.red
 p2 = plot(portfolioValue, "Portfolio Value", cvColor, 2)
 fillColor = portfolioValue >= totalInvested ? color.new(color.green, 85) : color.new(color.red, 85)
