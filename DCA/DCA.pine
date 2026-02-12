@@ -1,5 +1,5 @@
 //@version=6
-indicator("Dollar Cost Average (DCA - PAC) + Inflation adgustment", overlay=false)
+indicator("Dollar Cost Average Simulator (DCA - PAC) + CPI/FX adgustment", overlay=false)
 
 // --- Input ---
 monthlyAmount = input.int(100, "Monthly Amount", minval=1, step=10, group="DCA Settings")
