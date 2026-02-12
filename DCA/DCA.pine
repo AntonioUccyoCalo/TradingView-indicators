@@ -200,129 +200,132 @@ netValueFx     = profitLossFx > 0 ? portfolioValueHomeCcy - taxAmountFx : portfo
 netValueFxReal = profitLossFxReal > 0 ? portfolioValueHomeCcy - taxAmountFxReal : portfolioValueHomeCcy
 
 // --- Summary table ---
-numCols = 2 + (enableCpi ? 1 : 0) + (enableFxAdj ? 1 : 0)
+numCols = 2 + (enableFxAdj ? 1 : 0) + (enableCpi ? 1 : 0)
 numRows = 12 + (enableCpi ? 1 : 0) + (enableFxAdj ? 1 : 0)
-fxCol = enableCpi ? 3 : 2
+fxCol = 2
+cpiCol = enableFxAdj ? 3 : 2
 var table infoTable = table.new(position.top_right, numCols, numRows, bgcolor=color.new(color.black, 80), border_width=1)
 
 plColor     = profitLoss >= 0 ? color.green : color.red
 plRealColor = profitLossReal >= 0 ? color.green : color.red
 plFxColor   = profitLossFx >= 0 ? color.green : color.red
-// When both FX and CPI are active, the FX column shows FX+CPI combined values
+// When both FX and CPI are active, the CPI column shows FX+CPI combined values
 bool fxCpiCombined = enableFxAdj and enableCpi
-plFxDispColor = fxCpiCombined ? (profitLossFxReal >= 0 ? color.green : color.red) : plFxColor
+plFxCpiColor = fxCpiCombined ? (profitLossFxReal >= 0 ? color.green : color.red) : plRealColor
 
 if barstate.islast
     // Header row
     table.cell(infoTable, 0, 0, "", text_color=color.white, text_size=size.normal)
     table.cell(infoTable, 1, 0, (enableCpi or enableFxAdj) ? "Nominal" : "", text_color=color.gray, text_size=size.normal)
-    if enableCpi
-        table.cell(infoTable, 2, 0, "Real (CPI)", text_color=color.gray, text_size=size.normal)
     if enableFxAdj
-        table.cell(infoTable, fxCol, 0, fxCpiCombined ? "FX+CPI" : "FX Adj.", text_color=color.gray, text_size=size.normal)
+        table.cell(infoTable, fxCol, 0, "FX Adj.", text_color=color.gray, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, cpiCol, 0, fxCpiCombined ? "FX+CPI" : "Real (CPI)", text_color=color.gray, text_size=size.normal)
 
     // Invested
     table.cell(infoTable, 0, 1, "Invested", text_color=color.white, text_size=size.normal)
     table.cell(infoTable, 1, 1, formatNumber(totalInvested, 2), text_color=color.white, text_size=size.normal)
-    if enableCpi
-        table.cell(infoTable, 2, 1, formatNumber(investedReal, 2), text_color=color.yellow, text_size=size.normal)
     if enableFxAdj
-        table.cell(infoTable, fxCol, 1, formatNumber(fxCpiCombined ? investedFxReal : totalInvestedHomeCcy, 2), text_color=color.yellow, text_size=size.normal)
+        table.cell(infoTable, fxCol, 1, formatNumber(totalInvestedHomeCcy, 2), text_color=color.yellow, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, cpiCol, 1, formatNumber(fxCpiCombined ? investedFxReal : investedReal, 2), text_color=color.yellow, text_size=size.normal)
 
     // Portfolio Value
     table.cell(infoTable, 0, 2, "Portfolio Value", text_color=color.white, text_size=size.normal)
     table.cell(infoTable, 1, 2, formatNumber(portfolioValue, 2), text_color=color.white, text_size=size.normal)
-    if enableCpi
-        table.cell(infoTable, 2, 2, "-", text_color=color.gray, text_size=size.normal)
     if enableFxAdj
         table.cell(infoTable, fxCol, 2, formatNumber(portfolioValueHomeCcy, 2), text_color=color.white, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, cpiCol, 2, "-", text_color=color.gray, text_size=size.normal)
 
     // N. Investments
     table.cell(infoTable, 0, 3, "N. Investments", text_color=color.white, text_size=size.normal)
     table.cell(infoTable, 1, 3, str.tostring(monthsCount), text_color=color.white, text_size=size.normal)
-    if enableCpi
-        table.cell(infoTable, 2, 3, "-", text_color=color.gray, text_size=size.normal)
     if enableFxAdj
         table.cell(infoTable, fxCol, 3, "-", text_color=color.gray, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, cpiCol, 3, "-", text_color=color.gray, text_size=size.normal)
 
     // Avg Cost
     table.cell(infoTable, 0, 4, "Avg Cost", text_color=color.white, text_size=size.normal)
     table.cell(infoTable, 1, 4, formatNumber(avgPrice, 2), text_color=color.white, text_size=size.normal)
-    if enableCpi
-        table.cell(infoTable, 2, 4, "-", text_color=color.gray, text_size=size.normal)
     if enableFxAdj
         table.cell(infoTable, fxCol, 4, "-", text_color=color.gray, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, cpiCol, 4, "-", text_color=color.gray, text_size=size.normal)
 
     // P/L %
     table.cell(infoTable, 0, 5, "P/L %", text_color=color.white, text_size=size.normal)
     table.cell(infoTable, 1, 5, formatNumber(profitLossPct, 2) + " %", text_color=plColor, text_size=size.normal)
-    if enableCpi
-        table.cell(infoTable, 2, 5, formatNumber(profitLossRealPct, 2) + " %", text_color=plRealColor, text_size=size.normal)
     if enableFxAdj
-        table.cell(infoTable, fxCol, 5, formatNumber(fxCpiCombined ? profitLossFxRealPct : profitLossFxPct, 2) + " %", text_color=plFxDispColor, text_size=size.normal)
+        table.cell(infoTable, fxCol, 5, formatNumber(profitLossFxPct, 2) + " %", text_color=plFxColor, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, cpiCol, 5, formatNumber(fxCpiCombined ? profitLossFxRealPct : profitLossRealPct, 2) + " %", text_color=plFxCpiColor, text_size=size.normal)
 
     // P/L
     table.cell(infoTable, 0, 6, "P/L", text_color=color.white, text_size=size.normal)
     table.cell(infoTable, 1, 6, formatNumber(profitLoss, 2), text_color=plColor, text_size=size.normal)
-    if enableCpi
-        table.cell(infoTable, 2, 6, formatNumber(profitLossReal, 2), text_color=plRealColor, text_size=size.normal)
     if enableFxAdj
-        table.cell(infoTable, fxCol, 6, formatNumber(fxCpiCombined ? profitLossFxReal : profitLossFx, 2), text_color=plFxDispColor, text_size=size.normal)
+        table.cell(infoTable, fxCol, 6, formatNumber(profitLossFx, 2), text_color=plFxColor, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, cpiCol, 6, formatNumber(fxCpiCombined ? profitLossFxReal : profitLossReal, 2), text_color=plFxCpiColor, text_size=size.normal)
 
     // P/L % Ann.
     table.cell(infoTable, 0, 7, "P/L % Ann.", text_color=color.white, text_size=size.normal)
     table.cell(infoTable, 1, 7, formatNumber(annualizedPct, 2) + " %", text_color=plColor, text_size=size.normal)
-    if enableCpi
-        table.cell(infoTable, 2, 7, formatNumber(annualizedRealPct, 2) + " %", text_color=plRealColor, text_size=size.normal)
     if enableFxAdj
-        table.cell(infoTable, fxCol, 7, formatNumber(fxCpiCombined ? annualizedFxRealPct : annualizedFxPct, 2) + " %", text_color=plFxDispColor, text_size=size.normal)
+        table.cell(infoTable, fxCol, 7, formatNumber(annualizedFxPct, 2) + " %", text_color=plFxColor, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, cpiCol, 7, formatNumber(fxCpiCombined ? annualizedFxRealPct : annualizedRealPct, 2) + " %", text_color=plFxCpiColor, text_size=size.normal)
 
     // Max Drawdown
     table.cell(infoTable, 0, 8, "Max Drawdown", text_color=color.orange, text_size=size.normal)
     table.cell(infoTable, 1, 8, formatNumber(maxDrawdownPct, 2) + " %", text_color=color.orange, text_size=size.normal)
-    if enableCpi
-        table.cell(infoTable, 2, 8, "-", text_color=color.gray, text_size=size.normal)
     if enableFxAdj
         table.cell(infoTable, fxCol, 8, formatNumber(maxDrawdownPctFx, 2) + " %", text_color=color.orange, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, cpiCol, 8, "-", text_color=color.gray, text_size=size.normal)
 
     // Tax Rate
     table.cell(infoTable, 0, 9, "Tax Rate", text_color=color.red, text_size=size.normal)
     table.cell(infoTable, 1, 9, formatNumber(taxRate, 2) + " %", text_color=color.red, text_size=size.normal)
-    if enableCpi
-        table.cell(infoTable, 2, 9, "-", text_color=color.gray, text_size=size.normal)
     if enableFxAdj
         table.cell(infoTable, fxCol, 9, "-", text_color=color.gray, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, cpiCol, 9, "-", text_color=color.gray, text_size=size.normal)
 
     // Tax on P/L
     table.cell(infoTable, 0, 10, "Tax on P/L", text_color=color.red, text_size=size.normal)
     table.cell(infoTable, 1, 10, formatNumber(taxAmount, 2), text_color=color.red, text_size=size.normal)
-    if enableCpi
-        table.cell(infoTable, 2, 10, formatNumber(taxAmountReal, 2), text_color=color.red, text_size=size.normal)
     if enableFxAdj
-        table.cell(infoTable, fxCol, 10, formatNumber(fxCpiCombined ? taxAmountFxReal : taxAmountFx, 2), text_color=color.red, text_size=size.normal)
+        table.cell(infoTable, fxCol, 10, formatNumber(taxAmountFx, 2), text_color=color.red, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, cpiCol, 10, formatNumber(fxCpiCombined ? taxAmountFxReal : taxAmountReal, 2), text_color=color.red, text_size=size.normal)
 
     // Net After Taxes
     table.cell(infoTable, 0, 11, "Net After Taxes", text_color=color.aqua, text_size=size.normal)
     table.cell(infoTable, 1, 11, formatNumber(netValue, 2), text_color=color.aqua, text_size=size.normal)
-    if enableCpi
-        table.cell(infoTable, 2, 11, formatNumber(netValueReal, 2), text_color=color.aqua, text_size=size.normal)
     if enableFxAdj
-        table.cell(infoTable, fxCol, 11, formatNumber(fxCpiCombined ? netValueFxReal : netValueFx, 2), text_color=color.aqua, text_size=size.normal)
+        table.cell(infoTable, fxCol, 11, formatNumber(netValueFx, 2), text_color=color.aqua, text_size=size.normal)
+    if enableCpi
+        table.cell(infoTable, cpiCol, 11, formatNumber(fxCpiCombined ? netValueFxReal : netValueReal, 2), text_color=color.aqua, text_size=size.normal)
 
     // Info rows
     int infoRow = 12
-    if enableCpi
-        table.cell(infoTable, 0, infoRow, "CPI (" + cpiCountry + ")", text_color=color.gray, text_size=size.small)
-        table.cell(infoTable, 1, infoRow, not na(cpiStart) ? formatNumber(cpiStart, 1) : "N/A", text_color=color.gray, text_size=size.small)
-        table.cell(infoTable, 2, infoRow, not na(currentCpi) ? formatNumber(currentCpi, 1) : "N/A", text_color=color.gray, text_size=size.small)
-        infoRow += 1
     if enableFxAdj
         string fxLabel = "FX (" + portfolioCcy + "/" + homeCcy + ")"
         table.cell(infoTable, 0, infoRow, fxLabel, text_color=color.gray, text_size=size.small)
         table.cell(infoTable, 1, infoRow, not na(fxRateStart) ? str.tostring(math.round(fxRateStart, 4)) : "N/A", text_color=color.gray, text_size=size.small)
-        if enableCpi
-            table.cell(infoTable, 2, infoRow, "-", text_color=color.gray, text_size=size.small)
         table.cell(infoTable, fxCol, infoRow, not na(homePerPortfolio) ? str.tostring(math.round(homePerPortfolio, 4)) : "N/A", text_color=color.gray, text_size=size.small)
+        if enableCpi
+            table.cell(infoTable, cpiCol, infoRow, "-", text_color=color.gray, text_size=size.small)
+        infoRow += 1
+    if enableCpi
+        table.cell(infoTable, 0, infoRow, "CPI (" + cpiCountry + ")", text_color=color.gray, text_size=size.small)
+        table.cell(infoTable, 1, infoRow, not na(cpiStart) ? formatNumber(cpiStart, 1) : "N/A", text_color=color.gray, text_size=size.small)
+        if enableFxAdj
+            table.cell(infoTable, fxCol, infoRow, "-", text_color=color.gray, text_size=size.small)
+        table.cell(infoTable, cpiCol, infoRow, not na(currentCpi) ? formatNumber(currentCpi, 1) : "N/A", text_color=color.gray, text_size=size.small)
 
 // --- Plot ---
 p1 = plot(totalInvested, "Total Invested (Nominal)", color.orange, 2)
