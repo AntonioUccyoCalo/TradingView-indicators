@@ -6,7 +6,7 @@ monthlyAmount = input.int(100, "Monthly Amount", minval=1, step=10, group="DCA S
 startDate = input.time(timestamp("2005-12-01"), "Start Date", group="Period")
 endDate   = input.time(timestamp("2025-12-31"), "End Date",   group="Period")
 taxRate   = input.float(26.0, "Capital Gains Tax %", minval=0, maxval=100, step=0.5, group="Taxation")
-enableCpi = input.bool(true, "Enable CPI Adjustment", group="Inflation")
+enableCpi = input.bool(false, "Enable CPI Adjustment", group="Inflation")
 cpiCountry = input.string("USA", "CPI Country", options=["USA", "EU", "UK", "Japan", "Canada", "Australia"], group="Inflation")
 
 // --- Currency / FX Risk ---
