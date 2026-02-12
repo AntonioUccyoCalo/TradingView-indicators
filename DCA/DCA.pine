@@ -216,11 +216,12 @@ plFxCpiColor = fxCpiCombined ? (profitLossFxReal >= 0 ? color.green : color.red)
 if barstate.islast
     // Header row
     table.cell(infoTable, 0, 0, "", text_color=color.white, text_size=size.normal)
-    table.cell(infoTable, 1, 0, (enableCpi or enableFxAdj) ? "Nominal" : "", text_color=color.gray, text_size=size.normal)
+    string nominalHeader = (enableCpi or enableFxAdj) ? ("Nominal (" + portfolioCcy + ")") : ""
+    table.cell(infoTable, 1, 0, nominalHeader, text_color=color.gray, text_size=size.normal)
     if enableFxAdj
-        table.cell(infoTable, fxCol, 0, "FX Adj.", text_color=color.gray, text_size=size.normal)
+        table.cell(infoTable, fxCol, 0, "FX Adj. (" + homeCcy + ")", text_color=color.gray, text_size=size.normal)
     if enableCpi
-        table.cell(infoTable, cpiCol, 0, fxCpiCombined ? "FX+CPI" : "Real (CPI)", text_color=color.gray, text_size=size.normal)
+        table.cell(infoTable, cpiCol, 0, fxCpiCombined ? "FX+CPI (" + homeCcy + ")" : "Real (CPI)", text_color=color.gray, text_size=size.normal)
 
     // Invested
     table.cell(infoTable, 0, 1, "Invested", text_color=color.white, text_size=size.normal)
